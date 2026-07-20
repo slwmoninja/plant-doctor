@@ -362,7 +362,7 @@ input{font-family:inherit}
             </div>
             <div class="key-input-row">
               <input class="key-input" id="plantid-key-input" type="password" placeholder="Plant.id API key" autocomplete="off" spellcheck="false">
-              <button class="icon-btn" type="button" onclick="toggleKeyVis('plantid-key-input', this)" title="Show/hide key">👁</button>
+              <button class="icon-btn" id="plantid-key-toggle" type="button" onclick="toggleKeyVis('plantid-key-input', this)" title="Show/hide key">👁</button>
             </div>
             <button class="btn btn-secondary" style="align-self:flex-start" type="button" onclick="savePlantIdKey()">Save Key</button>
           </div>
@@ -641,6 +641,12 @@ function showScreen(name) {
 
   if(name === 'camera') setTimeout(initLiveCamera, 80);
   if(name === 'history') renderHistory();
+  if(name === 'settings') {
+    const keyInput = document.getElementById('plantid-key-input');
+    const keyToggleBtn = document.getElementById('plantid-key-toggle');
+    if(keyInput) keyInput.type = 'password';
+    if(keyToggleBtn) keyToggleBtn.textContent = '👁';
+  }
   if(name === 'settings') updateSettingsDisplay();
 }
 
@@ -1797,6 +1803,7 @@ function savePlantIdKey() {
   state.apiKey = document.getElementById('plantid-key-input').value.trim();
   localStorage.setItem('pc_apikey', state.apiKey);
   updateSettingsDisplay();
+  goHome();
 }
 
 function toggleKeyVis(inputId, btn) {
