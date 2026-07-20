@@ -1,0 +1,10 @@
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Local source copy + unused design assets (all imagery is embedded as base64 in index.html)
+ThePlantDoctor.html
+Arrow.jpg
+Camera.jpg
+PlantBanner2.png
+Plant_background.png
