@@ -156,7 +156,14 @@ async function handleCare(request, env) {
     const geminiBody = {
       contents: [{ parts: [{ text: textBlock.text }] }],
       generationConfig: {
-        maxOutputTokens: body.max_tokens || 1200
+        maxOutputTokens: body.max_tokens || 1200,
+        // This is a short, deterministic JSON-extraction task, not a reasoning
+        // task, so thinking is turned off entirely (budget 0) rather than just
+        // hidden — otherwise the model's reasoning tokens eat most of
+        // maxOutputTokens and can leak into the answer as plain text on
+        // thinking-capable models. includeThoughts:false is kept as a
+        // defensive backup in case a future model can't fully disable thinking.
+        thinkingConfig: { thinkingBudget: 0, includeThoughts: false }
       }
     };
 
@@ -170,7 +177,10 @@ async function handleCare(request, env) {
     }
 
     const upstreamData = result.data;
+    // Defense-in-depth: drop any part explicitly marked as a thought, even
+    // though thinkingConfig above should prevent them from appearing at all.
     const text = (upstreamData.candidates?.[0]?.content?.parts || [])
+      .filter(p => !p.thought)
       .map(p => p.text || '').join('');
 
     if (!text) {
