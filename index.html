@@ -339,24 +339,6 @@ input{font-family:inherit}
         </div>
         <div class="settings-note">Locked to this region until changed. Used for climate-specific care tips.</div>
       </div>
-      <!-- Service Status -->
-      <div class="settings-section">
-        <div class="settings-label">SERVICE</div>
-        <div class="settings-card">
-          <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:10px">
-            <div class="settings-row-content">
-              <div class="settings-row-title">Plant Identification &amp; Care Tips</div>
-              <div class="settings-row-value" id="worker-url-status">⚠️ Add your Worker URL below to enable plant identification</div>
-            </div>
-            <div class="key-input-row">
-              <input class="key-input" id="worker-url-input" type="password" placeholder="AI Proxy (Worker URL)" autocomplete="off" spellcheck="false">
-              <button class="icon-btn" id="worker-url-toggle" type="button" onclick="toggleKeyVis('worker-url-input', this)" title="Show/hide">👁</button>
-            </div>
-            <button class="btn btn-secondary" style="align-self:flex-start" type="button" onclick="saveWorkerUrl()">Save</button>
-          </div>
-        </div>
-        <div class="settings-note">Deploy your own free Cloudflare Worker (see ThePlantDoctor-Worker.js) to keep your Pl@ntNet and Gemini keys hidden server-side — never sent to or stored in this browser, only your Worker URL is.</div>
-      </div>
       <!-- Data -->
       <div class="settings-section">
         <div class="settings-label">DATA</div>
@@ -382,7 +364,7 @@ input{font-family:inherit}
             <div class="settings-row-icon">ℹ️</div>
             <div class="settings-row-content">
               <div class="settings-row-title">The Plant Doctor v1.0</div>
-              <div class="settings-row-value">Plant identification powered by Pl@ntNet</div>
+              <div class="settings-row-value">Plant identification &amp; care tips powered by Pl@ntNet &amp; Gemini</div>
             </div>
           </div>
         </div>
@@ -542,11 +524,15 @@ function getClimateZone(state, country) {
 }
 
 // ════════════════════════════════════════════════════
+//  CONFIGURATION
+// ════════════════════════════════════════════════════
+const DEFAULT_WORKER_URL = 'https://plantdoc.rfwrites2.workers.dev';
+
+// ════════════════════════════════════════════════════
 //  STATE
 // ════════════════════════════════════════════════════
 let state = {
   region: null,
-  workerUrl: '',
   photos: [],        // {file, previewUrl, base64}
   result: null,      // last analysis result
   history: [],
@@ -563,12 +549,8 @@ let state = {
 // ════════════════════════════════════════════════════
 window.addEventListener('load', function() {
   state.region = JSON.parse(localStorage.getItem('pc_region') || 'null');
-  state.workerUrl = localStorage.getItem('pc_workerurl') || '';
   state.history = JSON.parse(localStorage.getItem('pc_history') || '[]');
 
-  if(state.workerUrl) {
-    document.getElementById('worker-url-input').value = state.workerUrl;
-  }
   updateSettingsDisplay();
 
   if(state.region) {
@@ -624,12 +606,6 @@ function showScreen(name) {
 
   if(name === 'camera') setTimeout(initLiveCamera, 80);
   if(name === 'history') renderHistory();
-  if(name === 'settings') {
-    const keyInput = document.getElementById('worker-url-input');
-    const keyToggleBtn = document.getElementById('worker-url-toggle');
-    if(keyInput) keyInput.type = 'password';
-    if(keyToggleBtn) keyToggleBtn.textContent = '👁';
-  }
   if(name === 'settings') updateSettingsDisplay();
 }
 
@@ -638,10 +614,6 @@ function updateSettingsDisplay() {
   if(state.region) rv.textContent = state.region.state + ', ' + state.region.country;
   else rv.textContent = 'Not set — tap to configure';
   document.getElementById('settings-scan-count').textContent = state.history.length + ' plants in history';
-  const keyStatus = document.getElementById('worker-url-status');
-  if(keyStatus) {
-    keyStatus.textContent = state.workerUrl ? '✅ Active — plant ID & care tips enabled' : '⚠️ Add your Worker URL below to enable plant identification';
-  }
 }
 
 function updateRegionBadge() {
@@ -987,12 +959,10 @@ async function startAnalysis(overrideName, overrideSci) {
     state.result = { ...idResult, recommendations: recs, products, overrideName: overrideName || null };
 
     // Step 3: AI-enhanced care tips via Worker (optional)
-    if(state.workerUrl) {
-      try {
-        const aiRecs = await callCareTips(idResult.identification, state.region);
-        if(aiRecs && aiRecs.length > 0) state.result.recommendations = aiRecs;
-      } catch(e) { /* silently use built-in */ }
-    }
+    try {
+      const aiRecs = await callCareTips(idResult.identification, state.region);
+      if(aiRecs && aiRecs.length > 0) state.result.recommendations = aiRecs;
+    } catch(e) { /* silently use built-in */ }
 
     renderResults(photoHtml);
     saveBtn.style.display = 'flex';
@@ -1058,12 +1028,10 @@ async function applyOverride(name, sci) {
 
     setDot(2);
 
-    if(state.workerUrl) {
-      try {
-        const aiRecs = await callCareTips(identification, state.region);
-        if(aiRecs && aiRecs.length > 0) state.result.recommendations = aiRecs;
-      } catch(e) { /* use built-in recs */ }
-    }
+    try {
+      const aiRecs = await callCareTips(identification, state.region);
+      if(aiRecs && aiRecs.length > 0) state.result.recommendations = aiRecs;
+    } catch(e) { /* use built-in recs */ }
 
     renderResults(photoHtml);
     saveBtn.style.display = 'flex';
@@ -1095,13 +1063,12 @@ function setLoadingText(t) {
 //  PL@NTNET API
 // ════════════════════════════════════════════════════
 async function callPlantNet(photos) {
-  if(!state.workerUrl) throw new Error('Add your Worker URL in Settings to enable plant identification.');
   const form = new FormData();
   for(const p of photos) {
     const blob = await (await fetch(p.previewUrl)).blob();
     form.append('images', blob, 'photo.jpg');
   }
-  const resp = await fetch(state.workerUrl.replace(/\/$/, '') + '/identify?nb-results=6&lang=en', {
+  const resp = await fetch(DEFAULT_WORKER_URL + '/identify?nb-results=6&lang=en', {
     method: 'POST',
     body: form
   });
@@ -1161,7 +1128,7 @@ function parsePlantNetResponse(data) {
 async function callCareTips(identification, region) {
   const prompt = `You are a plant care expert. Provide care recommendations for ${identification.commonName} (${identification.scientificName}) in ${region.state}, ${region.country}. Return ONLY a JSON array of 6 objects with: category (watering|sunlight|soil|fertilizing|pruning|seasonal), title (5 words max), description (1-2 sentences, region-specific), frequency (optional string). No markdown, pure JSON only.`;
 
-  const resp = await fetch(state.workerUrl.replace(/\/$/, '') + '/care', {
+  const resp = await fetch(DEFAULT_WORKER_URL + '/care', {
     method:'POST',
     headers:{ 'content-type':'application/json' },
     body: JSON.stringify({ max_tokens:1200, messages:[{role:'user',content:[{type:'text',text:prompt}]}] })
@@ -1633,22 +1600,6 @@ function deleteHistoryEntry(id) {
   localStorage.setItem('pc_history', JSON.stringify(state.history));
   renderHistory();
   updateSettingsDisplay();
-}
-
-// ════════════════════════════════════════════════════
-//  SETTINGS
-// ════════════════════════════════════════════════════
-function saveWorkerUrl() {
-  state.workerUrl = document.getElementById('worker-url-input').value.trim();
-  localStorage.setItem('pc_workerurl', state.workerUrl);
-  updateSettingsDisplay();
-  goHome();
-}
-
-function toggleKeyVis(inputId, btn) {
-  const input = document.getElementById(inputId);
-  if(input.type === 'password') { input.type = 'text'; btn.textContent = '🙈'; }
-  else { input.type = 'password'; btn.textContent = '👁'; }
 }
 
 // ════════════════════════════════════════════════════
