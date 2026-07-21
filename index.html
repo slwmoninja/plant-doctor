@@ -345,17 +345,17 @@ input{font-family:inherit}
         <div class="settings-card">
           <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:10px">
             <div class="settings-row-content">
-              <div class="settings-row-title">Plant Identification</div>
-              <div class="settings-row-value" id="plantid-key-status">⚠️ Add your key below to enable plant identification</div>
+              <div class="settings-row-title">Plant Identification &amp; Care Tips</div>
+              <div class="settings-row-value" id="worker-url-status">⚠️ Add your Worker URL below to enable plant identification</div>
             </div>
             <div class="key-input-row">
-              <input class="key-input" id="plantid-key-input" type="password" placeholder="Pl@ntNet API key" autocomplete="off" spellcheck="false">
-              <button class="icon-btn" id="plantid-key-toggle" type="button" onclick="toggleKeyVis('plantid-key-input', this)" title="Show/hide key">👁</button>
+              <input class="key-input" id="worker-url-input" type="password" placeholder="AI Proxy (Worker URL)" autocomplete="off" spellcheck="false">
+              <button class="icon-btn" id="worker-url-toggle" type="button" onclick="toggleKeyVis('worker-url-input', this)" title="Show/hide">👁</button>
             </div>
-            <button class="btn btn-secondary" style="align-self:flex-start" type="button" onclick="savePlantIdKey()">Save Key</button>
+            <button class="btn btn-secondary" style="align-self:flex-start" type="button" onclick="saveWorkerUrl()">Save</button>
           </div>
         </div>
-        <div class="settings-note">Get a free key at my.plantnet.org (500 identifications/day). Stored only in this browser — never sent anywhere except Pl@ntNet.</div>
+        <div class="settings-note">Deploy your own free Cloudflare Worker (see ThePlantDoctor-Worker.js) to keep your Pl@ntNet and Gemini keys hidden server-side — never sent to or stored in this browser, only your Worker URL is.</div>
       </div>
       <!-- Data -->
       <div class="settings-section">
@@ -546,8 +546,7 @@ function getClimateZone(state, country) {
 // ════════════════════════════════════════════════════
 let state = {
   region: null,
-  apiKey: '',
-  anthropicKey: '',
+  workerUrl: '',
   photos: [],        // {file, previewUrl, base64}
   result: null,      // last analysis result
   history: [],
@@ -564,15 +563,11 @@ let state = {
 // ════════════════════════════════════════════════════
 window.addEventListener('load', function() {
   state.region = JSON.parse(localStorage.getItem('pc_region') || 'null');
-  state.apiKey = localStorage.getItem('pc_apikey') || '';
-  state.anthropicKey = localStorage.getItem('pc_anthropickey') || '';
+  state.workerUrl = localStorage.getItem('pc_workerurl') || '';
   state.history = JSON.parse(localStorage.getItem('pc_history') || '[]');
 
-  if(state.apiKey) {
-    document.getElementById('plantid-key-input').value = state.apiKey;
-  }
-  if(state.anthropicKey) {
-    document.getElementById('anthropic-key-input').value = state.anthropicKey;
+  if(state.workerUrl) {
+    document.getElementById('worker-url-input').value = state.workerUrl;
   }
   updateSettingsDisplay();
 
@@ -630,8 +625,8 @@ function showScreen(name) {
   if(name === 'camera') setTimeout(initLiveCamera, 80);
   if(name === 'history') renderHistory();
   if(name === 'settings') {
-    const keyInput = document.getElementById('plantid-key-input');
-    const keyToggleBtn = document.getElementById('plantid-key-toggle');
+    const keyInput = document.getElementById('worker-url-input');
+    const keyToggleBtn = document.getElementById('worker-url-toggle');
     if(keyInput) keyInput.type = 'password';
     if(keyToggleBtn) keyToggleBtn.textContent = '👁';
   }
@@ -643,9 +638,9 @@ function updateSettingsDisplay() {
   if(state.region) rv.textContent = state.region.state + ', ' + state.region.country;
   else rv.textContent = 'Not set — tap to configure';
   document.getElementById('settings-scan-count').textContent = state.history.length + ' plants in history';
-  const keyStatus = document.getElementById('plantid-key-status');
+  const keyStatus = document.getElementById('worker-url-status');
   if(keyStatus) {
-    keyStatus.textContent = state.apiKey ? '✅ Active — powered by Pl@ntNet' : '⚠️ Add your key below to enable plant identification';
+    keyStatus.textContent = state.workerUrl ? '✅ Active — plant ID & care tips enabled' : '⚠️ Add your Worker URL below to enable plant identification';
   }
 }
 
@@ -991,10 +986,10 @@ async function startAnalysis(overrideName, overrideSci) {
 
     state.result = { ...idResult, recommendations: recs, products, overrideName: overrideName || null };
 
-    // Step 3: Anthropic (optional, may fail due to CORS)
-    if(state.anthropicKey) {
+    // Step 3: AI-enhanced care tips via Worker (optional)
+    if(state.workerUrl) {
       try {
-        const aiRecs = await callAnthropic(idResult.identification, state.region);
+        const aiRecs = await callCareTips(idResult.identification, state.region);
         if(aiRecs && aiRecs.length > 0) state.result.recommendations = aiRecs;
       } catch(e) { /* silently use built-in */ }
     }
@@ -1007,7 +1002,7 @@ async function startAnalysis(overrideName, overrideSci) {
       <div class="error-card">
         <div class="error-icon">⚠️</div>
         <div class="error-title">Analysis Failed</div>
-        <div class="error-msg">${escHtml(e.message || 'Something went wrong. Check your API key in Settings and try again.')}</div>
+        <div class="error-msg">${escHtml(e.message || 'Something went wrong. Check your Worker URL in Settings and try again.')}</div>
         <button class="btn btn-primary" style="margin-top:8px" onclick="startAnalysis()">Try Again</button>
         <button class="btn btn-secondary" style="margin-top:4px" onclick="showScreen('settings');document.getElementById('tabbar').classList.add('visible')">Go to Settings</button>
       </div>`;
@@ -1063,9 +1058,9 @@ async function applyOverride(name, sci) {
 
     setDot(2);
 
-    if(state.anthropicKey) {
+    if(state.workerUrl) {
       try {
-        const aiRecs = await callAnthropic(identification, state.region);
+        const aiRecs = await callCareTips(identification, state.region);
         if(aiRecs && aiRecs.length > 0) state.result.recommendations = aiRecs;
       } catch(e) { /* use built-in recs */ }
     }
@@ -1100,18 +1095,19 @@ function setLoadingText(t) {
 //  PL@NTNET API
 // ════════════════════════════════════════════════════
 async function callPlantNet(photos) {
+  if(!state.workerUrl) throw new Error('Add your Worker URL in Settings to enable plant identification.');
   const form = new FormData();
   for(const p of photos) {
     const blob = await (await fetch(p.previewUrl)).blob();
     form.append('images', blob, 'photo.jpg');
   }
-  const resp = await fetch('https://my-api.plantnet.org/v2/identify/all?api-key=' + encodeURIComponent(state.apiKey) + '&nb-results=6&lang=en', {
+  const resp = await fetch(state.workerUrl.replace(/\/$/, '') + '/identify?nb-results=6&lang=en', {
     method: 'POST',
     body: form
   });
   if(!resp.ok) {
     const txt = await resp.text();
-    if(resp.status === 401 || resp.status === 403) throw new Error('Invalid Pl@ntNet API key. Please check your key in Settings.');
+    if(resp.status === 401 || resp.status === 403) throw new Error('Plant identification service rejected the request — check the Worker\'s PLANTNET_API_KEY secret.');
     if(resp.status === 429) throw new Error('API rate limit reached (500/day on the free tier). Please wait and try again.');
     throw new Error('Pl@ntNet API error ' + resp.status + ': ' + txt.slice(0,120));
   }
@@ -1160,17 +1156,17 @@ function parsePlantNetResponse(data) {
 }
 
 // ════════════════════════════════════════════════════
-//  ANTHROPIC API (optional — may have CORS issues)
+//  AI-ENHANCED CARE TIPS (via Worker → Gemini, optional)
 // ════════════════════════════════════════════════════
-async function callAnthropic(identification, region) {
+async function callCareTips(identification, region) {
   const prompt = `You are a plant care expert. Provide care recommendations for ${identification.commonName} (${identification.scientificName}) in ${region.state}, ${region.country}. Return ONLY a JSON array of 6 objects with: category (watering|sunlight|soil|fertilizing|pruning|seasonal), title (5 words max), description (1-2 sentences, region-specific), frequency (optional string). No markdown, pure JSON only.`;
 
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+  const resp = await fetch(state.workerUrl.replace(/\/$/, '') + '/care', {
     method:'POST',
-    headers:{ 'x-api-key': state.anthropicKey, 'anthropic-version':'2023-06-01', 'content-type':'application/json' },
-    body: JSON.stringify({ model:'claude-haiku-4-5-20251001', max_tokens:1200, messages:[{role:'user',content:prompt}] })
+    headers:{ 'content-type':'application/json' },
+    body: JSON.stringify({ max_tokens:1200, messages:[{role:'user',content:[{type:'text',text:prompt}]}] })
   });
-  if(!resp.ok) throw new Error('Anthropic API error ' + resp.status);
+  if(!resp.ok) throw new Error('Care tips service error ' + resp.status);
   const data = await resp.json();
   const text = data?.content?.[0]?.text || '[]';
   const parsed = JSON.parse(text);
@@ -1642,14 +1638,9 @@ function deleteHistoryEntry(id) {
 // ════════════════════════════════════════════════════
 //  SETTINGS
 // ════════════════════════════════════════════════════
-function saveApiKeys() {
-  state.anthropicKey = document.getElementById('anthropic-key-input').value.trim();
-  localStorage.setItem('pc_anthropickey', state.anthropicKey);
-}
-
-function savePlantIdKey() {
-  state.apiKey = document.getElementById('plantid-key-input').value.trim();
-  localStorage.setItem('pc_apikey', state.apiKey);
+function saveWorkerUrl() {
+  state.workerUrl = document.getElementById('worker-url-input').value.trim();
+  localStorage.setItem('pc_workerurl', state.workerUrl);
   updateSettingsDisplay();
   goHome();
 }
