@@ -200,8 +200,6 @@ input{font-family:inherit}
 .error-title{font-size:18px;font-weight:700;color:var(--err)}
 .error-msg{font-size:14px;color:var(--muted);line-height:1.5}
 
-/* ── Save banner ── */
-#save-banner{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:10px 22px;border-radius:20px;font-size:14px;font-weight:600;display:none;z-index:200;animation:fadeIn .2s ease;white-space:nowrap}
 #camera-tip{position:fixed;bottom:140px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.82);color:#fff;padding:13px 22px;border-radius:20px;font-size:14px;font-weight:600;z-index:200;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .25s ease}
 #camera-tip.visible{opacity:1}
 
@@ -290,7 +288,7 @@ input{font-family:inherit}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
     </button>
     <span class="hbar-title">Plant Analysis</span>
-    <button class="icon-btn" id="save-btn" onclick="saveScan()" title="Save">🔖</button>
+    <div style="width:40px"></div>
   </div>
   <div class="scroll">
     <div class="scroll-pad" id="results-content">
@@ -445,8 +443,6 @@ input{font-family:inherit}
   </div>
 </div>
 
-<!-- Save banner -->
-<div id="save-banner">✅ Saved to history!</div>
 <div id="camera-tip">Tap ✓ to proceed to analysis</div>
 
 </div><!-- #app -->
@@ -907,8 +903,6 @@ function goHome() {
 // ════════════════════════════════════════════════════
 async function startAnalysis(overrideName, overrideSci) {
   const content = document.getElementById('results-content');
-  const saveBtn = document.getElementById('save-btn');
-  saveBtn.style.display = 'none';
 
   // Show photos
   const photoHtml = `
@@ -965,7 +959,6 @@ async function startAnalysis(overrideName, overrideSci) {
     } catch(e) { /* silently use built-in */ }
 
     renderResults(photoHtml);
-    saveBtn.style.display = 'flex';
     autoSaveScan();
   } catch(e) {
     content.innerHTML = photoHtml + `
@@ -984,8 +977,6 @@ async function startAnalysis(overrideName, overrideSci) {
 // ════════════════════════════════════════════════════
 async function applyOverride(name, sci) {
   const content = document.getElementById('results-content');
-  const saveBtn = document.getElementById('save-btn');
-  saveBtn.style.display = 'none';
 
   const photoHtml = `<div style="display:flex;gap:8px;overflow-x:auto">
     ${state.photos.map(function(p){ return `<img src="${p.previewUrl}" style="width:90px;height:90px;border-radius:10px;object-fit:cover;flex-shrink:0">`; }).join('')}
@@ -1034,7 +1025,6 @@ async function applyOverride(name, sci) {
     } catch(e) { /* use built-in recs */ }
 
     renderResults(photoHtml);
-    saveBtn.style.display = 'flex';
     autoSaveScan();
   } catch(e) {
     content.innerHTML = photoHtml + `
@@ -1479,34 +1469,6 @@ function autoSaveScan() {
   if(state.history.length > 50) state.history = state.history.slice(0,50);
   localStorage.setItem('pc_history', JSON.stringify(state.history));
   state.scanSaved = true;
-  document.getElementById('save-btn').title = 'Saved';
-}
-
-function saveScan() {
-  if(!state.result || state.scanSaved) return;
-  const scan = {
-    id: Date.now().toString(),
-    date: new Date().toISOString(),
-    previewUrl: state.photos[0]?.previewUrl || null,
-    identification: state.result.identification,
-    recommendations: state.result.recommendations,
-    products: state.result.products,
-    region: state.region,
-    overrideName: state.result.overrideName || null
-  };
-  state.history.unshift(scan);
-  if(state.history.length > 50) state.history = state.history.slice(0,50);
-  localStorage.setItem('pc_history', JSON.stringify(state.history));
-  state.scanSaved = true;
-  document.getElementById('save-btn').textContent = '🔖';
-  showBanner('✅ Saved to history!');
-}
-
-function showBanner(msg) {
-  const b = document.getElementById('save-banner');
-  b.textContent = msg;
-  b.style.display = 'block';
-  setTimeout(function(){ b.style.display = 'none'; }, 2500);
 }
 
 // ════════════════════════════════════════════════════
